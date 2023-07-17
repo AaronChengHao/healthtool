@@ -7,9 +7,12 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
+	"healtool/tool"
 	"image/color"
 	"io"
 	"net/http"
@@ -18,33 +21,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 )
 
-var logs []string
-var logWidget *widget.Label
-var logContainer *container.Scroll
-
-func writeLog(msg string) {
-	msg = logWithTime(msg)
-	logs = append(logs, msg)
-	logWidget.SetText(strings.Join(logs, "\n"))
-	logContainer.ScrollToBottom()
-}
-
-func writeLogFail(msg string) {
-	writeLog(msg)
-	os.Exit(1)
-}
-
-func logWithTime(msg string) string {
-	now := time.Now()
-	logMsg := now.Format("2006-01-02 15:04:05") + " " + msg
-	return logMsg
-}
+var writeLog = tool.WriteLog
+var writeLogFail = tool.WriteLogFail
 
 func main() {
-	os.Setenv("FYNE_FONT", "MSYHL.TTC")
+	//os.Setenv("FYNE_FONT", "MSYHL.TTC")
 	defer func() {
 		if err := recover(); err != nil {
 			s := err.(string)
@@ -54,40 +37,58 @@ func main() {
 
 	myApp := app.New()
 
-	myWindow := myApp.NewWindow("整合平台工具")
+	tool.FyneWindow = myApp.NewWindow("整合平台工具")
 
-	logWidget = widget.NewLabel("日志信息")
+	tool.LogWidget = widget.NewLabel("log info")
 
 	btn1 := widget.NewButton("basic install", func() {
 		taskStart()
 	})
 
 	btn2 := widget.NewButton("full install", func() {
-		writeLog("开始下载安装包文件")
+		writeLog("start execute full install task")
 	})
 
-	img := canvas.NewImageFromResource(theme.FyneLogo())
-	text := canvas.NewText("Overlay", color.Black)
-	content := container.NewMax(img, text)
+	tool.LogContainer = container.NewScroll(tool.LogWidget)
+	tool.LogContainer.SetMinSize(fyne.Size{Height: 200})
 
-	logContainer = container.NewScroll(logWidget)
-	logContainer.SetMinSize(fyne.Size{Height: 200})
+	btnContainer := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), btn1, layout.NewSpacer(), btn2, layout.NewSpacer())
 
-	btnContainer := container.New(layout.NewHBoxLayout(), btn1, btn2)
+	ine := canvas.NewLine(color.White)
+	ine.StrokeWidth = 5
 
-	myWindow.SetContent(container.NewVBox(logContainer, btnContainer, content))
+	// 使用说明
+	explanLabel := widget.NewLabel(`
+instructions 
+1. dsaffdasfds
+2. safsdfsdfsafas
+3. sfsdafasdfsd`)
 
-	myWindow.Resize(fyne.Size{Width: 700, Height: 700})
+	tool.FyneWindow.SetContent(container.NewVBox(tool.LogContainer, ine, btnContainer, explanLabel))
 
-	myWindow.ShowAndRun()
+	tool.FyneWindow.Resize(fyne.Size{Width: 500, Height: 400})
+
+	tool.FyneWindow.ShowAndRun()
 }
 
 func taskStart() {
 	//downloadZip()
-	downloadChromeInstallExe()
+	//downloadChromeInstall()
+	openChrome()
 }
 
-func downloadChromeInstallExe() {
+func openChrome() {
+	path, _ := launcher.LookPath()
+	u := launcher.New().Bin(path).Delete("--headless").MustLaunch()
+	browser := rod.New().ControlURL(u).MustConnect()
+	browser.MustPage("https://health.cd120.info")
+	browser.MustPage("https://health-zhis.cd120.info")
+	dialog.NewConfirm("网址收藏", "请收藏网址", func(b bool) {
+
+	}, tool.FyneWindow).Show()
+}
+
+func downloadChromeInstall() {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("where", "chrome")
